@@ -1,0 +1,26 @@
+{
+  "name": "sharawadji",
+  "version": "0.1.0",
+  "description": "A library for playing spatialised audio localised in embedded Google Street View.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jakubfiala/sharawadji.git"
+  },
+  "keywords": [
+    "audio",
+    "google",
+    "street",
+    "view",
+    "web"
+  ],
+  "author": "Jakub Fiala",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jakubfiala/sharawadji/issues"
+  },
+  "homepage": "https://github.com/jakubfiala/sharawadji#readme"
+}
