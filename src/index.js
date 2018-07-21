@@ -5,6 +5,8 @@ class Sharawadji {
 	constructor(sounds, map) {
 		if (!('AudioContext' in window) && !('webkitAudioContext' in window)) {
 			throw new Error('Your browser does not support the Web Audio API');
+		} else {
+			window.AudioContext = window.AudioContext || window.webkitAudioContext;
 		}
 
 		if (!('google' in window)) {

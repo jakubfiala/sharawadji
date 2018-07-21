@@ -1,5 +1,6 @@
-// import { Howler, Howl } from './lib/howler.custom.js';
 import { latLngDist } from './utils.js';
+
+const MIX_TRANS_TIME = 0.7;
 
 class Sound {
   constructor(context, data, map) {
@@ -14,7 +15,8 @@ class Sound {
     this.source.loop = true;
 
     this.panner = context.createPanner();
-    this.panner.panningModel = 'equalpower';
+    this.panner.panningModel = 'HRTF';
+    this.panner.distanceModel = 'exponential';
 
     this.filter = context.createBiquadFilter();
     this.filter.type = 'lowpass';
@@ -66,10 +68,10 @@ class Sound {
     // Apply lowpass filter *if* the sound is behind us (11,000hz = filter fully open)
     if (Math.abs(angle) > 90) {
       this.filter.frequency
-        .linearRampToValueAtTime(11000 - (Math.abs(angle) - 90) * 55, this.context.currentTime + 1);
+        .linearRampToValueAtTime(11000 - (Math.abs(angle) - 90) * 55, this.context.currentTime + MIX_TRANS_TIME);
     } else {
       this.filter.frequency
-        .linearRampToValueAtTime(11000, this.context.currentTime + 1);
+        .linearRampToValueAtTime(11000, this.context.currentTime + MIX_TRANS_TIME);
     }
 
     // Calculate distance between user and sound
@@ -78,7 +80,7 @@ class Sound {
     const targetVolume = Sound.volumeForDistance(distance, this.data.db);
     // Set new volume
     this.gain.gain
-      .linearRampToValueAtTime(targetVolume, this.context.currentTime + 1);
+      .linearRampToValueAtTime(targetVolume, this.context.currentTime + MIX_TRANS_TIME);
   }
 
   static volumeForDistance(distance, amplitude) {
