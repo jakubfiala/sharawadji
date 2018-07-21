@@ -7,12 +7,12 @@ class Sound {
     this.data = data;
     this.map = map;
 
-    const { src, lat, lng } = data;
+    const { src, lat, lng, loop } = data;
     this.position = new google.maps.LatLng(lat, lng);
 
     this.context = context;
     this.source = context.createBufferSource();
-    this.source.loop = true;
+    this.source.loop = loop;
 
     this.panner = context.createPanner();
     this.panner.panningModel = 'HRTF';
@@ -29,7 +29,11 @@ class Sound {
       .connect(this.gain)
       .connect(this.context.destination);
 
-    this.load(src[0]);
+    try {
+      this.load(src);
+    } catch(e) {
+      console.warn(`Couldn't load ${src}`);
+    }
   }
 
   async load(src) {
@@ -37,9 +41,7 @@ class Sound {
     const soundData = await response.arrayBuffer();
 
     try {
-      var buffer = await this.context.decodeAudioData(soundData);
-
-      this.source.buffer = buffer;
+      this.source.buffer = await this.context.decodeAudioData(soundData);
       this.source.connect(this.panner);
 
       this.source.start(this.context.currentTime);
