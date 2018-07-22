@@ -2,7 +2,7 @@ import { Sound } from './sound.js';
 import { throttle } from './utils.js';
 
 class Sharawadji {
-	constructor(sounds, map) {
+	constructor(sounds, map, options) {
 		if (!('AudioContext' in window) && !('webkitAudioContext' in window)) {
 			throw new Error('Your browser does not support the Web Audio API');
 		} else {
@@ -14,8 +14,10 @@ class Sharawadji {
 				'Cannot find the Google Maps API. Make sure you\'ve included it in your HTML.');
 		}
 
+		const { debug } = options;
+
 		this.audioContext = new AudioContext();
-		this.sounds = sounds.map(s => new Sound(this.audioContext, s, map));
+		this.sounds = sounds.map(s => new Sound(this.audioContext, s, map, { debug }));
 
 		this.updateMix = this.updateMix.bind(this);
 

@@ -3,12 +3,22 @@ import { latLngDist } from './utils.js';
 const MIX_TRANS_TIME = 0.7;
 
 class Sound {
-  constructor(context, data, map) {
+  constructor(context, data, map, options) {
+    const { debug } = options;
+
     this.data = data;
     this.map = map;
 
     const { src, lat, lng, loop } = data;
     this.position = new google.maps.LatLng(lat, lng);
+
+    if (debug) {
+      this.marker = new google.maps.Marker({
+        title: `${this.data.name} – ${(new Date(data.timestamp)).toLocaleString()}`,
+        position: this.position,
+        map
+      });
+    }
 
     this.context = context;
     this.source = context.createBufferSource();

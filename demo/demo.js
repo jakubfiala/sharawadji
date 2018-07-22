@@ -23,7 +23,7 @@ const loadDemo = async container => {
   };
 
   const map = new google.maps.StreetViewPanorama(container, mapOptions);
-  const sharawadji = new Sharawadji(sounds, map);
+  const sharawadji = new Sharawadji(sounds, map, { debug: true });
 }
 
 loadDemo(document.getElementById('view'));
