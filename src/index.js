@@ -31,4 +31,6 @@ class Sharawadji {
 	}
 };
 
+window.Sharawadji = Sharawadji;
+
 export { Sharawadji };
