@@ -1,6 +1,7 @@
 import { latLngDist } from './utils.js';
 
 const MIX_TRANS_TIME = 0.7;
+const DISTANCE_THRESHOLD = 70;
 
 class Sound {
   constructor(context, data, map, options) {
@@ -8,9 +9,11 @@ class Sound {
 
     this.data = data;
     this.map = map;
+    this.loaded = false;
 
     const { src, lat, lng, loop } = data;
     this.position = new google.maps.LatLng(lat, lng);
+    this.src = src;
 
     if (debug) {
       this.marker = new google.maps.Marker({
@@ -39,23 +42,19 @@ class Sound {
       .connect(this.gain)
       .connect(this.context.destination);
 
-    try {
-      this.load(src);
-    } catch(e) {
-      console.warn(`Couldn't load ${src}`);
-    }
+    this.updateMix();
   }
 
   async load(src) {
     const response = await fetch(src);
     const soundData = await response.arrayBuffer();
+    this.loaded = true;
 
     try {
       this.source.buffer = await this.context.decodeAudioData(soundData);
       this.source.connect(this.panner);
 
       this.source.start(this.context.currentTime);
-      this.updateMix();
     } catch(e) {
       console.warn(`Couldn't decode ${src}`);
     }
@@ -63,6 +62,19 @@ class Sound {
 
   updateMix() {
     const userPosition = this.map.getPosition();
+
+    // Calculate distance between user and sound
+    const distance = latLngDist(this.position, userPosition);
+    console.log(this.data.name, distance);
+
+    if (!this.loaded && distance < DISTANCE_THRESHOLD) {
+      try {
+        this.load(this.src);
+      } catch(e) {
+        console.warn(`Couldn't load ${src}`);
+      }
+    }
+
     const userLat = userPosition.lat();
     const userLng = userPosition.lng();
     const userHeading = this.map.getPov().heading;
@@ -86,8 +98,6 @@ class Sound {
         .linearRampToValueAtTime(11000, this.context.currentTime + MIX_TRANS_TIME);
     }
 
-    // Calculate distance between user and sound
-    const distance = latLngDist(this.position, this.map.getPosition());
     // Calculate new volume based on distance
     const targetVolume = Sound.volumeForDistance(distance, this.data.db);
     // Set new volume

@@ -1,6 +1,6 @@
 import { Sharawadji } from '../src/index.js';
 
-const DATA_URL = 'https://s3-eu-west-1.amazonaws.com/ebre/sounds.json';
+const DATA_URL = 'https://s3-eu-west-1.amazonaws.com/ebre/test/test.json';
 
 const loadData = async url => {
   try {
