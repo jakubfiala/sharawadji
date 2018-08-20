@@ -1,7 +1,5 @@
 # sharawadji
 
-**NOT READY FOR PRODUCTION** – please don't use yet
-
 A library for playing spatialised audio localised in embedded Google Street View.
 
 Heavily based on the [Sounds of Street View Framework](https://github.com/Amplifon/Sounds-of-Street-View-Framework) by Amplifon.
@@ -47,6 +45,8 @@ const mapOptions = {
 
 const map = new google.maps.StreetViewPanorama(container, mapOptions);
 
+// you can toggle debug mode and the optional Web Audio compressor
+const options = { debug: false, compressor: true };
 // `sounds` is the soundwalk data object
-const sharawadji = new Sharawadji(sounds, map);
+const sharawadji = new Sharawadji(sounds, map, options);
 ```
