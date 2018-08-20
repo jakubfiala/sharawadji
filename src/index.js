@@ -14,10 +14,28 @@ class Sharawadji {
 				'Cannot find the Google Maps API. Make sure you\'ve included it in your HTML.');
 		}
 
-		const { debug } = options;
+		const { debug, compressor } = options;
 
 		this.audioContext = new AudioContext();
-		this.sounds = sounds.map(s => new Sound(this.audioContext, s, map, { debug }));
+		this.masterGain = this.audioContext.createGain();
+
+		this.sounds = sounds.map(s => new Sound(this.audioContext, s, map, this.masterGain, { debug }));
+
+		if (compressor) {
+			this.compressor = this.audioContext.createDynamicsCompressor();
+			this.compressor.threshold.setValueAtTime(-50, this.audioContext.currentTime);
+			this.compressor.knee.setValueAtTime(40, this.audioContext.currentTime);
+			this.compressor.ratio.setValueAtTime(25, this.audioContext.currentTime);
+			this.compressor.attack.setValueAtTime(0, this.audioContext.currentTime);
+			this.compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
+
+			this.masterGain
+				.connect(this.compressor)
+				.connect(this.audioContext.destination);
+		} else {
+			this.masterGain
+				.connect(this.audioContext.destination);
+		}
 
 		this.updateMix = this.updateMix.bind(this);
 

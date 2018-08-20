@@ -4,7 +4,7 @@ const MIX_TRANS_TIME = 0.7;
 const DISTANCE_THRESHOLD = 70;
 
 class Sound {
-  constructor(context, data, map, options) {
+  constructor(context, data, map, destination, options) {
     const { debug } = options;
 
     this.data = data;
@@ -24,6 +24,8 @@ class Sound {
     }
 
     this.context = context;
+    this.destination = destination;
+
     this.source = context.createBufferSource();
     this.source.loop = loop;
 
@@ -40,8 +42,9 @@ class Sound {
     this.panner
       .connect(this.filter)
       .connect(this.gain)
-      .connect(this.context.destination);
+      .connect(this.destination);
 
+    this.processingChainStart = this.panner;
     this.updateMix();
   }
 
@@ -52,7 +55,7 @@ class Sound {
 
     try {
       this.source.buffer = await this.context.decodeAudioData(soundData);
-      this.source.connect(this.panner);
+      this.source.connect(this.processingChainStart);
 
       this.source.start(this.context.currentTime);
     } catch(e) {
