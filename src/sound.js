@@ -3,13 +3,18 @@ import { latLngDist } from './utils.js';
 const MIX_TRANS_TIME = 0.7;
 const DISTANCE_THRESHOLD = 70;
 
+const IDLE = 0;
+const LOADING = 1;
+const LOADED = 2;
+
 class Sound {
   constructor(context, data, map, destination, options) {
     const { debug } = options;
 
+    this.debug = debug;
     this.data = data;
     this.map = map;
-    this.loaded = false;
+    this.state = IDLE;
 
     const { src, lat, lng, loop } = data;
     this.position = new google.maps.LatLng(lat, lng);
@@ -50,13 +55,24 @@ class Sound {
   async load(src) {
     const response = await fetch(src);
     const soundData = await response.arrayBuffer();
-    this.loaded = true;
+    this.state = LOADING;
+    if (this.debug) console.info(`loading ${src}`);
 
     try {
-      this.source.buffer = await this.context.decodeAudioData(soundData);
-      this.source.connect(this.processingChainStart);
-
-      this.source.start(this.context.currentTime);
+      // iOS Safari still doesn't support dAD with promises ¯\_(ツ)_/¯
+      this.context.decodeAudioData(
+        soundData,
+        buffer => {
+          if (this.debug) console.info(`loaded`, src, buffer, this.loaded);
+          this.source.buffer = buffer;
+          this.source.connect(this.processingChainStart);
+          this.source.start(this.context.currentTime);
+          this.state = LOADED;
+        },
+        err => {
+          throw new Error(err);
+        }
+      );
     } catch(e) {
       console.warn(`Couldn't decode ${src}`);
     }
@@ -67,14 +83,20 @@ class Sound {
 
     // Calculate distance between user and sound
     const distance = latLngDist(this.position, userPosition);
-    console.log(this.data.name, distance);
 
-    if (!this.loaded && distance < DISTANCE_THRESHOLD) {
-      try {
-        this.load(this.src);
-      } catch(e) {
-        console.warn(`Couldn't load ${src}`);
+    if (this.state === IDLE) {
+      if (distance < DISTANCE_THRESHOLD) {
+        try {
+          this.load(this.src);
+          return;
+        } catch(e) {
+          console.warn(`Couldn't load ${src}`);
+        }
+      } else {
+        return;
       }
+    } else if (this.state === LOADING) {
+      return;
     }
 
     const userLat = userPosition.lat();
