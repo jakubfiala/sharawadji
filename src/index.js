@@ -29,12 +29,10 @@ class Sharawadji {
 			this.compressor.attack.setValueAtTime(0, this.audioContext.currentTime);
 			this.compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
 
-			this.masterGain
-				.connect(this.compressor)
-				.connect(this.audioContext.destination);
+			this.masterGain.connect(this.compressor);
+			this.compressor.connect(this.audioContext.destination);
 		} else {
-			this.masterGain
-				.connect(this.audioContext.destination);
+			this.masterGain.connect(this.audioContext.destination);
 		}
 
 		this.updateMix = this.updateMix.bind(this);

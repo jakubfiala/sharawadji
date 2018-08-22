@@ -39,10 +39,9 @@ class Sound {
     this.gain = context.createGain();
     this.gain.gain.value = 0;
 
-    this.panner
-      .connect(this.filter)
-      .connect(this.gain)
-      .connect(this.destination);
+    this.panner.connect(this.filter);
+    this.filter.connect(this.gain);
+    this.gain.connect(this.destination);
 
     this.processingChainStart = this.panner;
     this.updateMix();
