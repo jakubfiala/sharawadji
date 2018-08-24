@@ -2,7 +2,7 @@ import { Sound } from './sound.js';
 import { throttle } from './utils.js';
 
 class Sharawadji {
-	constructor(sounds, map, options) {
+	constructor(sounds, panorama, options) {
 		if (!('AudioContext' in window) && !('webkitAudioContext' in window)) {
 			throw new Error('Your browser does not support the Web Audio API');
 		} else {
@@ -16,10 +16,12 @@ class Sharawadji {
 
 		const { debug, compressor } = options;
 
+		this.panorama = panorama;
+
 		this.audioContext = new AudioContext();
 		this.masterGain = this.audioContext.createGain();
 
-		this.sounds = sounds.map(s => new Sound(this.audioContext, s, map, this.masterGain, { debug }));
+		this.sounds = sounds.map(s => new Sound(this.audioContext, s, panorama, this.masterGain, { debug }));
 
 		if (compressor) {
 			this.compressor = this.audioContext.createDynamicsCompressor();
@@ -37,12 +39,26 @@ class Sharawadji {
 
 		this.updateMix = this.updateMix.bind(this);
 
-		google.maps.event.addListener(map, 'pano_changed', throttle(this.updateMix, 500));
-    google.maps.event.addListener(map, 'position_changed', throttle(this.updateMix, 500));
-    google.maps.event.addListener(map, 'pov_changed', throttle(this.updateMix, 500));
+		google.maps.event.addListener(panorama, 'pano_changed', throttle(this.updateMix, 500));
+    google.maps.event.addListener(panorama, 'position_changed', throttle(this.updateMix, 500));
+    google.maps.event.addListener(panorama, 'pov_changed', throttle(this.updateMix, 500));
 	}
 
 	updateMix() {
+		const userPosition = this.panorama.getPosition();
+		const userPov = this.panorama.getPov();
+
+		this.audioContext.listener.setPosition(userPosition.lat(), userPosition.lng(), 0);
+
+		const headingRad = userPov.heading * (Math.PI / 180);
+		const f1 = Math.cos(headingRad);
+		const f3 = Math.sin(headingRad);
+
+		const pitchRad = userPov.pitch * (Math.PI / 180);
+		const u1 = Math.cos(pitchRad);
+		const u3 = Math.sin(pitchRad);
+
+		this.audioContext.listener.setOrientation(f1, 0, f3, u1, 1, u3);
 		this.sounds.forEach(s => s.updateMix());
 	}
 };

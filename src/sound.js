@@ -1,6 +1,6 @@
 import { latLngDist } from './utils.js';
 
-const MIX_TRANS_TIME = 0.7;
+const MIX_TRANS_TIME = 2;
 const DISTANCE_THRESHOLD = 70;
 
 const IDLE = 0;
@@ -19,6 +19,7 @@ class Sound {
     const { src, lat, lng, loop } = data;
     this.position = new google.maps.LatLng(lat, lng);
     this.src = src;
+    this.loop = loop;
 
     if (debug) {
       this.marker = new google.maps.Marker({
@@ -31,17 +32,23 @@ class Sound {
     this.context = context;
     this.destination = destination;
 
-    this.source = context.createBufferSource();
-    this.source.loop = loop;
+    this.updateMix();
+  }
 
-    this.panner = context.createPanner();
+  createGraph() {
+    this.source = this.context.createBufferSource();
+    this.source.loop = this.loop;
+
+    this.panner = this.context.createPanner();
     this.panner.panningModel = 'HRTF';
     this.panner.distanceModel = 'exponential';
+    this.panner.setPosition(this.position.lat(), this.position.lng(), 0);
 
-    this.filter = context.createBiquadFilter();
+    this.filter = this.context.createBiquadFilter();
     this.filter.type = 'lowpass';
+    this.filter.frequency.value = 22000;
 
-    this.gain = context.createGain();
+    this.gain = this.context.createGain();
     this.gain.gain.value = 0;
 
     this.panner.connect(this.filter);
@@ -49,7 +56,6 @@ class Sound {
     this.gain.connect(this.destination);
 
     this.processingChainStart = this.panner;
-    this.updateMix();
   }
 
   async load(src) {
@@ -64,6 +70,8 @@ class Sound {
         soundData,
         buffer => {
           if (this.debug) console.info(`loaded`, src, buffer, this.loaded);
+          this.createGraph();
+
           this.source.buffer = buffer;
           this.source.connect(this.processingChainStart);
           this.source.start(this.context.currentTime);
@@ -80,7 +88,6 @@ class Sound {
 
   updateMix() {
     const userPosition = this.map.getPosition();
-
     // Calculate distance between user and sound
     const distance = latLngDist(this.position, userPosition);
 
@@ -97,29 +104,6 @@ class Sound {
       }
     } else if (this.state === LOADING) {
       return;
-    }
-
-    const userLat = userPosition.lat();
-    const userLng = userPosition.lng();
-    const userHeading = this.map.getPov().heading;
-
-    const xDiff = this.position.lat() - userLat;
-    const yDiff = this.position.lng() - userLng;
-
-    const rawAngle = Math.atan2(yDiff, xDiff) * (180 / Math.PI) - userHeading;
-    // wrap the angle so it ranges between -180 and 180
-    const angle = Math.abs(rawAngle) > 180 ? -1 * rawAngle % 180 : rawAngle;
-
-    // Set the new pan poition
-    this.panner.setPosition(angle / 90 % 2, 1, 1);
-
-    // Apply lowpass filter *if* the sound is behind us (11,000hz = filter fully open)
-    if (Math.abs(angle) > 90) {
-      this.filter.frequency
-        .linearRampToValueAtTime(11000 - (Math.abs(angle) - 90) * 55, this.context.currentTime + MIX_TRANS_TIME);
-    } else {
-      this.filter.frequency
-        .linearRampToValueAtTime(11000, this.context.currentTime + MIX_TRANS_TIME);
     }
 
     // Calculate new volume based on distance
