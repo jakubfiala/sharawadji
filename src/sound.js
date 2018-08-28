@@ -1,7 +1,8 @@
 import { latLngDist } from './utils.js';
 
 const MIX_TRANS_TIME = 2;
-const DISTANCE_THRESHOLD = 70;
+const PLAY_DISTANCE_THRESHOLD = 70;
+const LOAD_DISTANCE_THRESHOLD = 100;
 
 class Sound {
   constructor(context, data, map, destination, options) {
@@ -88,7 +89,8 @@ class Sound {
           if (this.debug) console.info(`loaded`, src, buffer, this.loaded);
           this.buffer = buffer;
           this.createFXGraph();
-          this.start();
+          this.state = Sound.state.SUSPENDED;
+          this.playIfNear();
         },
         err => {
           throw new Error(err);
@@ -99,42 +101,51 @@ class Sound {
     }
   }
 
-  updateMix() {
+  playIfNear() {
     const userPosition = this.map.getPosition();
     // Calculate distance between user and sound
     const distance = latLngDist(this.position, userPosition);
 
     switch(this.state) {
-      case Sound.state.IDLE:
-        if (distance < DISTANCE_THRESHOLD) {
-          try {
-            this.load(this.src);
-            return;
-          } catch(e) {
-            console.warn(`Couldn't load ${src}`);
-          }
-        } else {
-          return;
-        }
-        break;
       case Sound.state.LOADING:
-        return;
+        return false;
       case Sound.state.PLAYING:
-        if (distance >= DISTANCE_THRESHOLD) {
+        if (distance >= PLAY_DISTANCE_THRESHOLD) {
           this.stop();
+          return false;
         }
         break;
       case Sound.state.SUSPENDED:
-        if (distance < DISTANCE_THRESHOLD) {
+        if (distance < PLAY_DISTANCE_THRESHOLD) {
           this.start();
         } else {
-          return;
+          return false;
+        }
+        break;
+      case Sound.state.IDLE:
+      default:
+        if (distance < LOAD_DISTANCE_THRESHOLD) {
+          try {
+            this.load(this.src);
+          } catch(e) {
+            console.warn(`Couldn't load ${src}`);
+          }
+          return false;
+        } else {
+          return false;
         }
         break;
     }
 
+    return distance;
+  }
+
+  updateMix(gain) {
+    const distance = this.playIfNear();
+    if (distance === false) return;
+
     // Calculate new volume based on distance
-    const targetVolume = Sound.volumeForDistance(distance, this.data.db);
+    const targetVolume = Sound.volumeForDistance(distance, this.data.db) * gain;
     // Set new volume
     this.gain.gain
       .linearRampToValueAtTime(targetVolume, this.context.currentTime + MIX_TRANS_TIME);

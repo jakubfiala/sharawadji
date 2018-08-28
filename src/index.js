@@ -1,6 +1,8 @@
 import { Sound } from './sound.js';
 import { throttle } from './utils.js';
 
+const ATTENUATION_TARGET = 60;
+
 class Sharawadji {
 	constructor(sounds, panorama, options) {
 		if (!('AudioContext' in window) && !('webkitAudioContext' in window)) {
@@ -27,8 +29,8 @@ class Sharawadji {
 			this.compressor = this.audioContext.createDynamicsCompressor();
 			this.compressor.threshold.setValueAtTime(-50, this.audioContext.currentTime);
 			this.compressor.knee.setValueAtTime(40, this.audioContext.currentTime);
-			this.compressor.ratio.setValueAtTime(25, this.audioContext.currentTime);
-			this.compressor.attack.setValueAtTime(0, this.audioContext.currentTime);
+			this.compressor.ratio.setValueAtTime(20, this.audioContext.currentTime);
+			this.compressor.attack.setValueAtTime(0.3, this.audioContext.currentTime);
 			this.compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
 
 			this.masterGain.connect(this.compressor);
@@ -59,7 +61,11 @@ class Sharawadji {
 		const u3 = Math.sin(pitchRad);
 
 		this.audioContext.listener.setOrientation(f1, 0, f3, u1, 1, u3);
-		this.sounds.forEach(s => s.updateMix());
+
+		const activeSoundsCount = this.sounds.filter(s => s.state === Sound.state.PLAYING).length;
+
+		const attenuation = Math.max(Math.min(activeSoundsCount / ATTENUATION_TARGET, 0.7), 0);
+		this.sounds.forEach(s => s.updateMix(1 - attenuation));
 	}
 };
 
