@@ -52,7 +52,7 @@ class Sound {
     this.filter.frequency.value = 22000;
 
     this.gain = this.context.createGain();
-    this.gain.gain.value = 0;
+    this.gain.gain.setValueAtTime(0, this.context.currentTime);
 
     this.panner.connect(this.filter);
     this.filter.connect(this.gain);
