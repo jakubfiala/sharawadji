@@ -5,6 +5,7 @@
   <title>Sharawadji Demo</title>
   <style type="text/css">
     body, html {
+      font-family: monospace;
       margin: 0;
       padding: 0;
     }
@@ -15,11 +16,21 @@
       position: relative;
       background: #000;
     }
+
+    #start {
+      font: inherit;
+      position: fixed;
+      inset: 1rem 0 0 1rem;
+      width: max-content;
+      height: max-content;
+      z-index: 1;
+    }
   </style>
   <script src="//maps.googleapis.com/maps/api/js?key=AIzaSyD4t08-2stO8aoJMic94BQUYwLCjI-2AI0&v=3.exp"></script>
-  <script defer type="text/javascript" src="demo.min.js"></script>
+  <script defer type="module" src="demo.js"></script>
 </head>
 <body>
+  <button id="start">Start</button>
   <main id="view"></main>
 </body>
 </html>

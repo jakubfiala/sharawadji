@@ -1,35 +1,46 @@
-import { latLngDist } from './utils.js';
+import { latLngDist } from "./utils.js";
 
-const MIX_TRANS_TIME = 2;
-const PLAY_DISTANCE_THRESHOLD = 70;
-const LOAD_DISTANCE_THRESHOLD = 100;
+const REF_DISTANCE = 1e-4;
+const MAX_DISTANCE = 250;
+const PLAY_DISTANCE_THRESHOLD = 300;
+const LOAD_DISTANCE_THRESHOLD = PLAY_DISTANCE_THRESHOLD + 20;
 
-class Sound {
-  constructor(context, data, map, destination, options) {
-    const { debug } = options;
-
-    this.debug = debug;
+export default class Sound {
+  constructor(context, data, map, destination) {
     this.data = data;
     this.map = map;
     this.state = Sound.state.IDLE;
 
-    const { src, lat, lng, loop } = data;
-    this.position = new google.maps.LatLng(lat, lng);
+    const {
+      src,
+      lat,
+      lng,
+      gain,
+      rolloffFactor = 2,
+      loop = true,
+      filterFrequency = 22000,
+      filterType = "lowpass",
+      positionZ = 0,
+      startTime = 0,
+      endTime = Infinity,
+    } = data;
+
+    this.position = { lat, lng };
     this.src = src;
     this.loop = loop;
-
-    if (debug) {
-      this.marker = new google.maps.Marker({
-        title: `${this.data.name} – ${(new Date(data.timestamp)).toLocaleString()}`,
-        position: this.position,
-        map
-      });
-    }
+    this.gainValue = gain;
+    this.rolloffFactor = rolloffFactor;
+    this.filterFrequency = filterFrequency;
+    this.filterType = filterType;
+    this.positionZ = positionZ;
+    this.startTime = startTime;
+    this.endTime = endTime;
 
     this.context = context;
     this.destination = destination;
+    this.abortController = new AbortController();
 
-    this.updateMix();
+    this.updateMix(1);
   }
 
   static get state() {
@@ -37,86 +48,118 @@ class Sound {
       IDLE: 0,
       LOADING: 1,
       PLAYING: 2,
-      SUSPENDED: 3
+      SUSPENDED: 3,
+      REMOVED: 4,
     };
   }
 
   createFXGraph() {
-    this.panner = this.context.createPanner();
-    this.panner.panningModel = 'HRTF';
-    this.panner.distanceModel = 'exponential';
-    this.panner.setPosition(this.position.lat(), this.position.lng(), 0);
+    this.panner = new PannerNode(this.context);
+    this.panner.panningModel = "HRTF";
+    this.panner.distanceModel = "exponential";
+    this.panner.refDistance = REF_DISTANCE;
+    this.panner.maxDistance = MAX_DISTANCE;
+    this.panner.positionX.value = this.position.lat;
+    this.panner.positionY.value = this.position.lng;
+    this.panner.positionZ.value = this.positionZ;
+    this.panner.rolloffFactor = this.rolloffFactor;
 
-    this.filter = this.context.createBiquadFilter();
-    this.filter.type = 'lowpass';
-    this.filter.frequency.value = 22000;
+    this.filter = new BiquadFilterNode(this.context);
+    this.filter.type = this.filterType;
+    this.filter.frequency.value = this.filterFrequency;
 
-    this.gain = this.context.createGain();
-    this.gain.gain.setValueAtTime(0, this.context.currentTime);
+    this.gain = new GainNode(this.context);
+    this.gain.gain.setValueAtTime(this.gainValue, this.context.currentTime);
 
     this.panner.connect(this.filter);
     this.filter.connect(this.gain);
     this.gain.connect(this.destination);
 
     this.processingChainStart = this.panner;
+    this.processingChainEnd = this.gain;
   }
 
   start() {
-    this.source = this.context.createBufferSource();
+    this.source = new AudioBufferSourceNode(this.context);
     this.source.loop = this.loop;
+    this.source.loopStart = this.startTime;
+    this.source.loopEnd = Math.min(this.buffer.duration, this.endTime);
     this.source.buffer = this.buffer;
     this.source.connect(this.processingChainStart);
-    this.source.start(this.context.currentTime);
+    this.source.start(this.context.currentTime, this.startTime);
     this.state = Sound.state.PLAYING;
   }
 
-  stop() {
+  suspend() {
     this.source.disconnect();
     this.state = Sound.state.SUSPENDED;
   }
 
-  async load(src) {
-    const response = await fetch(src);
-    const soundData = await response.arrayBuffer();
+  remove() {
+    if (this.state === Sound.state.LOADING) {
+      this.abortController.abort();
+    }
+
+    this.source?.stop();
+    this.source?.disconnect();
+    this.state = Sound.state.REMOVED;
+  }
+
+  async load() {
+    if (this.buffer) {
+      this.playIfNear();
+      return;
+    }
+
     this.state = Sound.state.LOADING;
-    if (this.debug) console.info(`loading ${src}`);
+    const response = await fetch(this.src, {
+      signal: this.abortController.signal,
+    });
+
+    const soundData = await response.arrayBuffer();
+    console.debug('[sharawadji]', `loading ${this.src}`);
 
     try {
       // iOS Safari still doesn't support dAD with promises ¯\_(ツ)_/¯
-      this.context.decodeAudioData(
-        soundData,
-        buffer => {
-          if (this.debug) console.info(`loaded`, src, buffer, this.loaded);
-          this.buffer = buffer;
-          this.createFXGraph();
-          this.state = Sound.state.SUSPENDED;
-          this.playIfNear();
-        },
-        err => {
-          throw new Error(err);
-        }
-      );
-    } catch(e) {
-      console.warn(`Couldn't decode ${src}`);
+      const buffer = await this.context.decodeAudioData(soundData);
+
+      if (this.state === Sound.state.REMOVED) return;
+
+      console.debug('[sharawadji]', `loaded`, this.src);
+
+      this.buffer = buffer;
+      this.createFXGraph();
+      this.state = Sound.state.SUSPENDED;
+      this.playIfNear();
+    } catch (e) {
+      console.warn('[sharawadji]', `Couldn't decode ${this.src}`, e);
     }
   }
 
-  playIfNear() {
+  updateMix() {
     const userPosition = this.map.getPosition();
+    if (!userPosition) {
+      return false;
+    }
+
     // Calculate distance between user and sound
     const distance = latLngDist(this.position, userPosition);
 
-    switch(this.state) {
+    switch (this.state) {
+      case Sound.state.REMOVED:
+        return false;
       case Sound.state.LOADING:
         return false;
       case Sound.state.PLAYING:
         if (distance >= PLAY_DISTANCE_THRESHOLD) {
-          this.stop();
+          console.debug("[sharawadji]", "suspending", this.data.name);
+          this.suspend();
           return false;
         }
         break;
       case Sound.state.SUSPENDED:
         if (distance < PLAY_DISTANCE_THRESHOLD) {
+          console.debug("[sharawadji]", "starting", this.data.name);
           this.start();
         } else {
           return false;
@@ -126,9 +169,9 @@ class Sound {
       default:
         if (distance < LOAD_DISTANCE_THRESHOLD) {
           try {
-            this.load(this.src);
-          } catch(e) {
-            console.warn(`Couldn't load ${src}`);
+            this.load();
+          } catch (e) {
+            console.debug('[sharawadji]', `Couldn't load ${this.src}`);
           }
           return false;
         } else {
@@ -136,27 +179,5 @@ class Sound {
         }
         break;
     }
-
-    return distance;
   }
-
-  updateMix(gain) {
-    const distance = this.playIfNear();
-    if (distance === false) return;
-
-    // Calculate new volume based on distance
-    const targetVolume = Sound.volumeForDistance(distance, this.data.db) * gain;
-    // Set new volume
-    this.gain.gain
-      .linearRampToValueAtTime(targetVolume, this.context.currentTime + MIX_TRANS_TIME);
-  }
-
-  static volumeForDistance(distance, amplitude) {
-    // Calculate volume by using Inverse Square Law
-    const volume = 1 / distance ** 2;
-    // Multiply distance volume by amplitude of sound (apply ceiling max of 1)
-    return Math.min(volume * amplitude, 1);
-  };
 }
-
-export { Sound };
