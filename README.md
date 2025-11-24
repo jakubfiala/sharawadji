@@ -4,10 +4,13 @@ A library for playing spatialised audio localised in embedded Google Street View
 
 ## Usage
 
+To use Sharawadji, you need to embed an instance of Street View on a website.
+Refer to the [official documentation](https://developers.google.com/maps/documentation/javascript/streetview) for a quick guide on how to set up embedded Street View.
+
 First, you need to create a JSON/JavaScript array containing the soundwalk data.
 Here's an example of a soundwalk with 2 sounds:
 
-```json
+```js
 [
   {
     "name": "ac35fb0f-d22e-44c7-a468-c42650604ea6",
@@ -25,7 +28,14 @@ Here's an example of a soundwalk with 2 sounds:
     "timestamp": 1529766751245,
     "src": "https://s3-eu-west-1.amazonaws.com/ebre/fac7b958-0f9b-455b-af2f-d45c469a4e4b.mp3",
     "db": 80,
-    "loop": false
+    "loop": false,
+    "rolloffFactor": 2, // the lower this number, the further the sound reaches (it's inversely proportional)
+    "loop": true,
+    "filterFrequency": 22000, // add a filter to the sound
+    "filterType": "lowpass",
+    "positionZ": 0, // displace the sound up/down if needed
+    "startTime": 0, // select start & end of the loop within the sound file
+    "endTime": 1000,
   }
 ]
 ```
